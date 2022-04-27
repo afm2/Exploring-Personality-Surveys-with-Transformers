@@ -1,0 +1,103 @@
+INFO,ITEM
+Honesty_Humility,
++ keyed,"I wouldn't use flattery to get a raise or promotion at work, even if I thought it would succeed."
++ keyed,I wouldn't pretend to like someone just to get that person to do favors for me.
++ keyed,"I would never accept a bribe, even if it were very large."
++ keyed,Having a lot of money is not especially important to me.
++ keyed,I am an ordinary person who is no better than others.
++ keyed,I wouldn’t want people to treat me as though I were superior to them.
+- keyed,"If I want something from a person I dislike, I will act very nicely toward that person in order to get it."
+- keyed,"If I want something from someone, I will laugh at that person's worst jokes."
+- keyed,"If I knew that I could never get caught, I would be willing to steal a million dollars."
+- keyed,I would be tempted to buy stolen property if I were financially tight.
+- keyed,"I’d be tempted to use counterfeit money, if I were sure I could get away with it."
+- keyed,"I would like to live in a very expensive, high-class neighborhood."
+- keyed,I would like to be seen driving around in a very expensive car.
+- keyed,I would get a lot of pleasure from owning expensive luxury goods.
+- keyed,I think that I am entitled to more respect than the average person is.
+- keyed,I want people to know that I am an important person of high status.
+Emotionality,
++ keyed,I would feel afraid if I had to travel in bad weather conditions.
++ keyed,"When it comes to physical danger, I am very fearful."
++ keyed,I sometimes can't help worrying about little things.
++ keyed,I get very anxious when waiting to hear about an important decision.
++ keyed,"When I suffer from a painful experience, I need someone to make me feel comfortable."
++ keyed,"Whenever I feel worried about something, I want to share my concern with another person."
++ keyed,I feel like crying when I see other people crying.
++ keyed,"When someone I know well is unhappy, I can almost feel that person's pain myself."
++ keyed,I feel strong emotions when someone close to me is going away for a long time.
+- keyed,I don’t mind doing jobs that involve dangerous work.
+- keyed,Even in an emergency I wouldn't feel like panicking.
+- keyed,I worry a lot less than most people do.
+- keyed,"I rarely, if ever, have trouble sleeping due to stress or anxiety."
+- keyed,I can handle difficult situations without needing emotional support from anyone else.
+- keyed,I rarely discuss my problems with other people.
+- keyed,I remain unemotional even in situations where most people get very sentimental.
+Extraversion,
++ keyed,I feel reasonably satisfied with myself overall.
++ keyed,I think that most people like some aspects of my personality.
++ keyed,"In social situations, I'm usually the one who makes the first move."
++ keyed,"When I'm in a group of people, I'm often the one who speaks on behalf of the group."
++ keyed,I enjoy having lots of people around to talk with.
++ keyed,I prefer jobs that involve active social interaction to those that involve working alone.
++ keyed,The first thing that I always do in a new place is to make friends.
++ keyed,I am energetic nearly all the time.
++ keyed,"On most days, I feel cheerful and optimistic."
+- keyed,I feel that I am an unpopular person.
+- keyed,I sometimes feel that I am a worthless person.
+- keyed,I rarely express my opinions in group meetings.
+- keyed,I tend to feel quite self-conscious when speaking in front of a group of people.
+- keyed,"I avoid making ""small talk"" with people."
+- keyed,People often tell me that I should try to cheer up.
+- keyed,Most people are more upbeat and dynamic than I generally am.
+Agreeableness,
++ keyed,"I rarely hold a grudge, even against people who have badly wronged me."
++ keyed,"My attitude toward people who have treated me badly is ""forgive and forget""."
++ keyed,I generally accept people’s faults without complaining about them.
++ keyed,I tend to be lenient in judging other people.
++ keyed,"Even when people make a lot of mistakes, I rarely say anything negative."
++ keyed,I am usually quite flexible in my opinions when people disagree with me.
++ keyed,"I rarely feel anger, even when people treat me quite badly."
++ keyed,Most people tend to get angry more quickly than I do.
+- keyed,"If someone has cheated me once, I will always feel suspicious of that person."
+- keyed,I find it hard to fully forgive someone who has done something mean to me.
+- keyed,People sometimes tell me that I am too critical of others.
+- keyed,People sometimes tell me that I'm too stubborn.
+- keyed,"When people tell me that I’m wrong, my first reaction is to argue with them."
+- keyed,I find it hard to compromise with people when I really think I’m right.
+- keyed,People think of me as someone who has a quick temper.
+- keyed,I find it hard to keep my temper when people insult me.
+Conscientiousness,
++ keyed,I clean my office or home quite frequently.
++ keyed,"I plan ahead and organize things, to avoid scrambling at the last minute."
++ keyed,"When working, I often set ambitious goals for myself."
++ keyed,I often push myself very hard when trying to achieve a goal.
++ keyed,I often check my work over repeatedly to find any mistakes.
++ keyed,"I always try to be accurate in my work, even at the expense of time."
++ keyed,People often call me a perfectionist.
++ keyed,I don’t allow my impulses to govern my behavior.
+- keyed,People often joke with me about the messiness of my room or desk.
+- keyed,"When working, I sometimes have difficulties due to being disorganized."
+- keyed,"Often when I set a goal, I end up quitting without having reached it."
+- keyed,I do only the minimum amount of work needed to get by.
+- keyed,"When working on something, I don't pay much attention to small details."
+- keyed,I make decisions based on the feeling of the moment rather than on careful thought.
+- keyed,I make a lot of mistakes because I don't think before I act.
+- keyed,"I prefer to do whatever comes to mind, rather than stick to a plan."
+Openness to Experience,
++ keyed,"If I had the opportunity, I would like to attend a classical music concert."
++ keyed,Sometimes I like to just watch the wind as it blows through the trees.
++ keyed,I'm interested in learning about the history and politics of other countries.
++ keyed,I enjoy looking at maps of different places.
++ keyed,"I would enjoy creating a work of art, such as a novel, a song, or a painting."
++ keyed,People have often told me that I have a good imagination.
++ keyed,I like people who have unconventional views.
++ keyed,I think of myself as a somewhat eccentric person.
+- keyed,I would be quite bored by a visit to an art gallery.
+- keyed,I wouldn't spend my time reading a book of poetry.
+- keyed,I would be very bored by a book about the history of science and technology.
+- keyed,I’ve never really enjoyed looking through an encyclopedia.
+- keyed,I would like a job that requires following a routine rather than being creative.
+- keyed,I don't think of myself as the artistic or creative type.
+- keyed,I think that paying attention to radical ideas is a waste of time.
+- keyed,I find it boring to discuss philosophy.

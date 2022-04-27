@@ -1,0 +1,555 @@
+---
+title: "EBICGlasso Analyses"
+output: html_notebook
+---
+
+---
+title: "EBICGlasso Analyses"
+output: html_notebook
+---
+
+NOTE: This script is only provided to demonstrate how EBICGlasso was implemented in this study. The response data collected in this study is NOT made publicly available to protect the identities of the participants.
+
+```{r}
+library(tidyverse)
+library(qgraph)
+library(psych)
+set.seed(2020)
+
+all_items_w_prompts = openxlsx::read.xlsx("/Users/Alex/Library/Mobile Documents/com~apple~CloudDocs/School/Dissertation/Defense/Results/HEXACO Item-Facet Key 8-20.xlsx")
+
+#df = openxlsx::read.xlsx("/Users/Alex/Library/Mobile Documents/com~apple~CloudDocs/School/Dissertation/Defense/Data/MTurk Pilot/Cleaned Response Data No Attn.xlsx") 
+df = openxlsx::read.xlsx("/Users/Alex/Library/Mobile Documents/com~apple~CloudDocs/School/Dissertation/Analyses/Cleaned Response Data No Attn.xlsx") 
+dim(df)
+
+item_info = openxlsx::read.xlsx("/Users/Alex/Library/Mobile Documents/com~apple~CloudDocs/School/Dissertation/Analyses/Item_Info.xlsx")
+```
+
+Build df for Item Info and HEXACO Facets used for generation
+```{r}
+item_info = item_info %>% 
+  select(contains(c("Agreeableness", "Conscientiousness", "Emotionality", "Extraversion", "Openness", "Honesty.Humility"))) %>% 
+  t(.) %>% as.data.frame(.)
+
+colnames(item_info) = "Item"
+
+#hexaco_facets = hexaco_facets %>% 
+all_items_w_prompts = all_items_w_prompts %>% 
+  select(Item, contains(c("Factor","Facet","Prompt_")))
+
+item_info = item_info %>%
+  mutate(Idx = rownames(.)) %>% 
+#  full_join(., hexaco_facets)
+  left_join(., all_items_w_prompts)
+
+```
+
+
+```{r}
+lvls = c("Very Inaccurate", "Moderately Inaccurate", "Neither Accurate Nor Inaccurate", "Moderately Accurate", "Very Accurate")
+lbls = c(1:5)
+
+net_df = df   %>% 
+#  filter( !grepl(x = Agreeableness_1, pattern = "In general,|ImportId")) %>% 
+  dplyr::select(contains( c("Agreeableness","Conscientiousness", "Emotionality", "Openness", "Extraversion", "Honesty.Humility") )) #%>% 
+#           map(.x = ., .f = ~factor(.x, levels = lvls, labels = lbls)) %>% 
+#         map(.x = ., .f = ~as.numeric(.x)) %>% bind_cols(.) 
+
+```
+
+
+# Totals 
+Address reverse coded items!!!!
+```{r}
+factor_totals = pmap(.l = list(factor = c("Agreeableness","Conscientiousness", "Emotionality", "Openness", "Extraversion", "Honesty.Humility")),
+     .f = function(factor){
+       factor <- enquo(factor)
+        net_df %>% 
+         dplyr::select(contains(!!factor)) %>% 
+         mutate(!!factor := rowSums(.)) %>% 
+         dplyr::select(!!factor)
+     }) %>% 
+  bind_cols(.)
+
+cor(factor_totals)
+```
+
+```{r}
+pwalk(.l = list(df_name = c("ag","co", "emo", "ext", "opn", "hh"), factor_name = c("Agreeableness","Conscientiousness", "Emotionality", "Extraversion", "Openness", "Honesty.Humility")), net_df,
+ .f = function(df_name, factor_name, net_df){
+   curr_df <- net_df %>% 
+     dplyr::select(matches(factor_name))
+   
+   assign(x = df_name, value = {{curr_df}}, envir = globalenv() )
+ }
+ )
+```
+
+```{r}
+results <- bootnet::estimateNetwork(
+      ag,
+      default = 'EBICglasso',
+      corMethod = 'cor_auto',
+ #     corMethod = 'spearman',
+      threshold = F,
+      nlambda = 60,
+      tuning = 0,
+      
+      #criterion = "ebic",
+      penalize.diagonal = T,
+    sampleSize = "minimum",
+    # refit = F,
+    countDiagonal = T,
+    verbose=T
+    
+  )
+
+
+best_lambda <- results$results$results$rholist[which.min(results$results$ebic)]
+best_ebic <- results$results$ebic[which.min(results$results$ebic)]
+best_lambda ;best_ebic
+```
+
+
+
+Functions for generating results.
+```{r}
+# Runs qgraph::EBICglasso() for one gamma value and num_lambda lambda values
+run_EBICglasso <- function(.dat, .gamma, num_lambda = 30){
+  
+  results <- bootnet::estimateNetwork(
+      data = .dat,
+      default = 'EBICglasso',
+      corMethod = 'cor_auto',
+ #     corMethod = 'spearman',
+      threshold = F,
+      nlambda = num_lambda,
+      tuning = .gamma,
+      
+      #criterion = "ebic",
+      penalize.diagonal = F,
+    sampleSize = "minimum",
+    # refit = F,
+    countDiagonal = F,
+    verbose=T
+  )
+    
+    # Log the EBIC values, their respective lambda values, and their rank (w.r.t. EBIC).
+    params = cbind.data.frame(1:num_lambda, results$results$ebic, results$results$lambda, Gamma = .gamma); colnames(params) = c("IDX","EBIC", "Lambda", "Gamma")
+    ebic_rank = params %>% arrange(EBIC) %>% mutate(EBIC_Rank = 1:nrow(params)) %>% select(EBIC, EBIC_Rank) 
+    params = left_join(params, ebic_rank)
+    
+    # Return a list containing the run log, and all partial correlation networks
+    run_list = list(params, results$results$results$w)
+    #run_list = list(params, results)#$results$w)
+    
+    
+    return(run_list)
+}
+
+# Map the above function across a range of gamma values (gamma_string), for a given dataset (.dat).
+map_EBICglasso = function(.dat, gamma_string = c(0, .25, .5))    mapped_results = map(.x = gamma_string, .f = ~run_EBICglasso(.dat = {{.dat}}, .gamma = .x))
+
+
+```
+Get all results
+```{r}
+ag_results = map_EBICglasso(ag)
+co_results = map_EBICglasso(co)
+emo_results = map_EBICglasso(emo)
+ext_results = map_EBICglasso(ext)
+opn_results = map_EBICglasso(opn)
+hh_results = map_EBICglasso(hh)
+```
+
+
+```{r}
+ag_results[[1]][[1]]; ag_results[[2]][[1]];ag_results[[3]][[1]]
+```
+
+```{r}
+
+iter_plot = function(.results, i, .layout = "spring", label_scale = 1, node_labels = c(), legend_label_scale = .3, layout_ratio = 1.85, edge_labels = F){
+  curr_net = .results[[1]][[2]][1:16, 1:16, i]
+  
+  curr_Lambda = round(.results[[1]][[1]]$Lambda[i], digits = 3)
+  lambda_expression = substitute(lambda[i] == curr_Lambda, list(i = i, curr_Lambda = curr_Lambda))
+  
+  g1 = round(.results[[1]][[1]]$EBIC[i], digits = 0)
+  g2 = round(.results[[2]][[1]]$EBIC[i], digits = 0)
+  g3 = round(.results[[3]][[1]]$EBIC[i], digits = 0)
+  
+  g1_expression = substitute(gamma[1] == g1, list(g1 = g1))
+  g2_expression = substitute(gamma[2] == g2, list(g2 = g2))
+  g3_expression = substitute(gamma[3] == g3, list(g3 = g3))
+  lambda_lbl = c(
+    lambda_expression, 
+    g1_expression, 
+    g2_expression, 
+    g3_expression, 
+    expression() # Leaving this at the end of the string forces all other items prior to be evaluated as an expression! No idea why but great!!!
+                 
+#                 expression(gamma[0] == phantom(0)), bquote(.(round(.results[[1]][[1]]$EBIC[i], digits = 0))),
+#                 expression(gamma[.25] == phantom(0)), bquote(.(round(.results[[2]][[1]]$EBIC[i], digits = 0))),
+#                 expression(gamma[.5] == phantom(0)), bquote(.(round(.results[[3]][[1]]$EBIC[i], digits = 0)))
+                 
+                 )
+  
+  if(length(node_labels) > 0){ 
+  plt = qgraph::qgraph(input = curr_net, layout = .layout, threshold = "sig", sampleSize = 292, normalize = F, DoNotPlot = F, 
+   nodeNames = node_labels, legend.cex = legend_label_scale, GLratio = layout_ratio,
+   edge.labels = edge_labels);
+  
+  text(c(-1),# X-axis plotting locations for LHS and RHS of hyperparameter-value pairs.
+       c(1.2,1.05,.9,.75), labels = lambda_lbl, cex = label_scale ) # Y-axis plotting locations for LHS and RHS of hyperparameter-value pairs.
+
+  }else{
+    plt = qgraph::qgraph(input = curr_net, layout = .layout, threshold = "sig", sampleSize = 292, normalize = F, DoNotPlot = F,  edge.labels = edge_labels);
+  text(c(-1),# X-axis plotting locations for LHS and RHS of hyperparameter-value pairs.
+       c(1.2,1.05,.9,.75), labels = lambda_lbl, cex = label_scale ) # Y-axis plotting locations for LHS and RHS of hyperparameter-value pairs.
+  
+  }
+  return(plt)
+}
+
+
+
+```
+
+
+
+```{r}
+save_nets <- function(.results, file_name = file_name){
+
+  plt_idx <- 1:30
+  best_idxs = list()
+  best_idxs[[1]] = which(.results[[1]][[1]]$EBIC_Rank == 1)
+  best_idxs[[2]] = which(.results[[2]][[1]]$EBIC_Rank == 1)
+  best_idxs[[3]] = which(.results[[3]][[1]]$EBIC_Rank == 1)
+
+  png(file_name, width = 3000, height = 3000)
+
+
+  layout(matrix(c(1,1,2,3,4,5,6, 1,1,7,8,9,10,11, 12,13,14,15,16,17,18,
+                19,20,21,22,23,24,25, 26,27,28,29,30,31,32), 5, 7, byrow = T), respect = T);
+  iter_plot(.results = {{.results}}, i =  best_idxs[[3]], .layout = "circle", label_scale = 4)
+  
+  walk(.x = plt_idx, .results = {{.results}}, best_idx = unlist(best_idxs), 
+       .f = function(.x, .results, best_idx){ 
+    iter_plot(.results = .results, i = .x, .layout = "circle", label_scale = 2);
+    if(.x == best_idx[1]) polygon(c(-1.25, -1.25, 1.25, 1.25), c(-1.25, 1.275, 1.275, -1.25), col= "transparent", lwd = 5, border = "red") # Outline Plot if current idx matches best_idx
+    if(.x == best_idx[2]) polygon(c(-1.25, -1.25, 1.25, 1.25), c(-1.25, 1.275, 1.275, -1.25), col= "transparent", lwd = 5, border = "#FFCC00") # Outline Plot if current idx matches best_idx
+    if(.x == best_idx[3]) polygon(c(-1.25, -1.25, 1.25, 1.25), c(-1.25, 1.275, 1.275, -1.25), col= "transparent", lwd = 5, border = "green") # Outline Plot if current idx matches best_idx
+    })
+
+  dev.off()
+}
+#ag_results[[1]][[2]][1:16,1:16,1]
+```
+
+Generate plots containing all 30 networks for each of the 6 factors.
+```{r}
+save_nets(.results = ag_results, file_name = "Agreeableness_Nets.png")
+save_nets(.results = co_results, file_name = "Conscientiousness_Nets.png")
+save_nets(.results = emo_results, file_name = "Emotionality_Nets.png")
+save_nets(.results = ext_results, file_name = "Extraversion_Nets.png")
+save_nets(.results = opn_results, file_name = "Openness_Nets.png")
+save_nets(.results = hh_results, file_name = "Honesty-Humility_Nets.png")
+
+```
+
+```{r}
+centralities <- qgraph::centrality_auto(ag_results[[1]][[2]][1:16,1:16,3], signed = T)
+clusters <- qgraph::clustcoef_auto(ag_results[[1]][[2]][1:16,1:16,3])
+centralities; clusters
+```
+
+
+
+
+```{r}
+node_dat <- cbind.data.frame(centralities$node.centrality$Strength, centralities$node.centrality$Betweenness, clusters$signed_clustZhang)
+colnames(node_dat) <- c("Strength", "Betweenness", "Signed_Zhang")
+
+ggplot(data = node_dat, aes(x = Strength, y = Signed_Zhang, Betweenness)) +
+  ggplot2::geom_point(size = 2, mapping = aes(color = Betweenness)) +
+ theme(axis.text.x = element_text(), axis.line = element_line()) +
+  #coord_cartesian(xlim = c(.0075,.015), ylim = c(.07,.2)) + 
+  geom_label(mapping = aes(label = rownames(node_dat), color = Betweenness)) +
+   scale_color_gradient2(low = "yellow", mid = "darkblue", high = "red", midpoint = mean(node_dat$Betweenness))
+```
+
+#### Evaluating the Best Performing, Most Parsimonious Partial Correlation Networks
+Plots 3 Networks for a Given Factor...
+```{r}
+best_nets <- function(.results, indices, save_plot = F, ...){
+
+  factor_name = NULL # for adding items to legend...
+  label_scale = 1
+  legend_label_scale = .5 # Will need to increase when exporting!
+  legend_y = 6 # Might need to tweak...
+  legend_x = 3 # Should be centered every time...
+  title_scale = 1
+  
+  
+  
+  elements = rlang::dots_list(..., .named = T)
+  pwalk(.l = list(var = names(elements), val = elements),  .f = function(var, val) assign(x = var, value = val, envir = sys.frame(-3) )) 
+  
+if(!is.null(factor_name)){  
+  # Get item text
+  node_labs = item_info %>%
+    filter(grepl(x = Idx, pattern = factor_name)) %>% 
+    select(Item) %>% 
+    unite(Facet) %>% 
+    select(Facet) %>% 
+    unlist(., use.names = F)
+  
+  # Find best spot to add '\n' for longer items...
+  idx = imap(
+  .x = node_labs,
+  .f = function(x, .id ){
+   str_locate_all(string = node_labs[.id], pattern = " ") %>%
+      as.data.frame(.) %>% cbind.data.frame(.,  .[,1] > 25) %>% filter(.[,3]) %>% 
+      select(start) %>% unlist(., use.names = F)  %>% .[1]
+    }) %>%
+    unlist(., use.names = F) 
+ 
+  # Update longer items to split using idx...
+node_labs <-   pmap_chr(.l = list(label = node_labs, idx = idx), .f = function(label, idx){
+    if(!is.na(idx)){ 
+      substr(x = label, start = idx, stop = idx) <-  '\n'; label 
+    }else{paste0(label, "\n")}  }) 
+
+node_labs <- str_glue('{idx}. {lab}{sep}', lab = node_labs, sep = rep(c('\n','\n','\n','NEXT BLOCK'), times = 4), idx = 1:16)
+node_labs  <-  glue::glue_collapse(node_labs) %>% str_split(string = ., pattern = "NEXT BLOCK") %>% unlist(., use.names = F)
+node_labs <- node_labs[-5] # Might not always have an empty last string??? WHY IS IT THERE???
+
+}else{node_labs = NULL}
+  
+if(save_plot){
+  file_name = paste0("Best_", factor_name, "_Nets",".png")
+  png(file_name, width = 3000, height = 1500)
+  
+}  
+
+layout(mat = matrix(c(1,2,3), nrow = 1, byrow = T), respect = T);
+
+pmap(.l = list(curr_idx = indices, curr_col = c("red", "yellow", "green")), .f = function(curr_idx, curr_col){
+  
+iter_plot(.results = .results, i = curr_idx, .layout = "spring", label_scale = label_scale, edge_labels = F); 
+    polygon(c(-1.25, -1.25, 1.25, 1.25), c(-1.25, 1.275, 1.275, -1.25), col= "transparent", border = curr_col, lwd = 4)  
+});
+  
+if(!is.null(node_labs)){
+  
+  block_shift_y = map_dbl(.x = node_labs, .f = function(x) x %>% str_count(string = ., pattern = "\n") %>% sum(.)) + legend_y
+  #block_shift_x = c(-.8,-.55,-.3,-.05)*legend_x
+  block_shift_x = (seq(-.75,1,by=.5)*legend_x)-3
+  
+  pwalk(.l = list(lab = node_labs, block_y = block_shift_y, block_x = block_shift_x), .f = function(lab, block_x, block_y){
+  mtext(text = lab, side = 1, outer = F, cex = legend_label_scale, adj = 0, lheight = 0,
+      #at = c(-6.5,-4.5,-2.5,-0.5), line = c(6,8,10,12)
+      at = block_x, line = block_y
+      )
+  })
+};
+
+if(!is.null(factor_name)) mtext(text = factor_name, side = 3, line = 5, at = -2.5, cex = 2*title_scale, adj = .5, padj = 0)
+
+if(save_plot) dev.off()
+}
+
+```
+
+
+```{r}
+best_nets(.results = ag_results, factor_name = "Agreeableness", indices = c(12,16,19), 
+          label_scale = 2, legend_label_scale = 1.5, legend_y = 16, title_scale = 2, save_plot = T)
+best_nets(.results = ag_results, factor_name = "Agreeableness", indices = c(12,16,19), 
+           legend_label_scale = .5, legend_y = 6, title_scale = 1)
+
+
+best_nets(.results = emo_results, factor_name = "Emotionality", indices = c(12,16,19), 
+          label_scale = 2, legend_label_scale = 1.5, legend_y = 16, title_scale = 2, save_plot = T)
+best_nets(.results = co_results, factor_name = "Conscientiousness", indices = c(12,16,19), 
+          label_scale = 2, legend_label_scale = 1.5, legend_y = 16, title_scale = 2, save_plot = T)
+best_nets(.results = ext_results, factor_name = "Extraversion", indices = c(12,16,19), 
+          label_scale = 2, legend_label_scale = 1.5, legend_y = 16, title_scale = 2, save_plot = T)
+best_nets(.results = opn_results, factor_name = "Openness", indices = c(12,16,19), 
+          label_scale = 2, legend_label_scale = 1.5, legend_y = 16, title_scale = 2, save_plot = T)
+best_nets(.results = hh_results, factor_name = "Honesty.Humility", indices = c(12,16,19), 
+          label_scale = 2, legend_label_scale = 1.5, legend_y = 16, title_scale = 2, save_plot = T)
+
+```
+
+
+```{r}
+node_labs = item_info %>%
+  filter(grepl(x = Idx, pattern = "Agreeableness")) %>% 
+  #select(contains("Facet")) %>% 
+  select(Item) %>% 
+  unite(Facet) %>% 
+  select(Facet) %>% 
+  unlist(., use.names = F)
+
+iter_plot(ag_results, 19, .layout = "spring", label_scale = 1, node_labels = node_labs, edge_labels = F, legend_label_scale = .5); # Example Plot
+    polygon(c(-1.25, -1.25, 1.25, 1.25), c(-1.25, 1.275, 1.275, -1.25), col= "transparent", border = "green")  
+```
+
+```{r}
+graph_mat <- qgraph(ag_results[[3]][[2]][1:16,1:16,19])
+qgraph::smallworldIndex(x = graph_mat)
+
+centralities <- qgraph::centrality_auto(x = graph_mat, signed = T)
+centralities$node.centrality
+qgraph::clustcoef_auto(x = graph_mat)
+
+edge_dat = cbind.data.frame(graph_mat$Edgelist$from, graph_mat$Edgelist$to, graph_mat$Edgelist$weight) 
+colnames(edge_dat) = c("from", "to", "weight")  
+#edge_dat %>% 
+#  filter(from == 5 | to == 5)
+
+item_info %>% filter(grepl(Idx, pattern = "Agreeableness")) %>% 
+  select(Item, Idx, contains(c("Facet", "Prompt"))) 
+
+#item_info %>% filter(grepl(Idx, pattern = "Emotionality")) %>% 
+#  select(contains("Prompt")) %>% 
+#  unlist(., use.names = F) %>% 
+#  cbind.data.frame(.) %>% 
+#  table(.)
+```
+
+
+```{r}
+node_labs = item_info %>%
+  filter(grepl(x = Idx, pattern = "Conscientiousness")) %>% 
+#  select(contains("Facet")) %>% 
+  select(Item) %>% 
+  unite(Facet) %>% 
+  select(Facet) %>% 
+  unlist(., use.names = F)
+
+iter_plot(co_results, 21, .layout = "spring", label_scale = 1, node_labels = node_labs, legend_label_scale = .275, layout_ratio = 1.7, edge_labels = F); # Example Plot
+    polygon(c(-1.25, -1.25, 1.25, 1.25), c(-1.25, 1.275, 1.275, -1.25), col= "transparent", border = "green")  
+```
+
+
+```{r}
+node_labs = item_info %>%
+  filter(grepl(x = Idx, pattern = "Emotionality")) %>% 
+#  select(contains("Facet")) %>% 
+  select(Item) %>% 
+  unite(Facet) %>% 
+  select(Facet) %>% 
+  unlist(., use.names = F)
+
+iter_plot(emo_results, 20, .layout = "spring", label_scale = 1, node_labels = node_labs, legend_label_scale = .275, layout_ratio = 1.7); # Example Plot
+    polygon(c(-1.25, -1.25, 1.25, 1.25), c(-1.25, 1.275, 1.275, -1.25), col= "transparent", border = "green")  
+```
+
+```{r}
+graph_mat <- qgraph(emo_results[[3]][[2]][1:16,1:16,20])
+qgraph::smallworldIndex(x = graph_mat)
+
+centralities <- qgraph::centrality_auto(x = graph_mat, signed = T)
+centralities$node.centrality
+qgraph::clustcoef_auto(x = graph_mat)
+
+edge_dat = cbind.data.frame(graph_mat$Edgelist$from, graph_mat$Edgelist$to, graph_mat$Edgelist$weight) 
+colnames(edge_dat) = c("from", "to", "weight")  
+#edge_dat %>% 
+#  filter(from == 5 | to == 5)
+
+item_info %>% filter(grepl(Idx, pattern = "Emotionality")) %>% 
+  select(Item, Idx, contains(c("Facet", "Prompt"))) 
+
+#item_info %>% filter(grepl(Idx, pattern = "Emotionality")) %>% 
+#  select(contains("Prompt")) %>% 
+#  unlist(., use.names = F) %>% 
+#  cbind.data.frame(.) %>% 
+#  table(.)
+```
+
+
+
+```{r}
+node_labs = item_info %>%
+  filter(grepl(x = Idx, pattern = "Extraversion")) %>% 
+ # select(contains("Facet")) %>% 
+  select(Item) %>% 
+  unite(Facet) %>% 
+  select(Facet) %>% 
+  unlist(., use.names = F)
+
+iter_plot(ext_results, 19, .layout = "spring", label_scale = 1, node_labels = node_labs, legend_label_scale = .28, layout_ratio = 2.2); # Example Plot
+    polygon(c(-1.25, -1.25, 1.25, 1.25), c(-1.25, 1.275, 1.275, -1.25), col= "transparent", border = "green")  
+```
+
+```{r}
+graph_mat <- qgraph(ext_results[[3]][[2]][1:16,1:16,19])
+qgraph::smallworldIndex(x = graph_mat)
+
+qgraph::centrality_auto(x = graph_mat, signed = T)
+qgraph::clustcoef_auto(x = graph_mat,.1)
+
+edge_dat = cbind.data.frame(graph_mat$Edgelist$from, graph_mat$Edgelist$to, graph_mat$Edgelist$weight) 
+colnames(edge_dat) = c("from", "to", "weight")  
+edge_dat %>% 
+  filter(from == 5 | to == 5)
+```
+
+
+```{r}
+node_labs = item_info %>%
+  filter(grepl(x = Idx, pattern = "Openness")) %>% 
+#  select(contains("Facet")) %>% 
+  select(Item) %>% 
+  unite(Facet) %>% 
+  select(Facet) %>% 
+  unlist(., use.names = F)
+
+iter_plot(opn_results, 20, .layout = "spring", label_scale = 1, node_labels = node_labs, legend_label_scale = .275, layout_ratio = 1.7); # Example Plot
+    polygon(c(-1.25, -1.25, 1.25, 1.25), c(-1.25, 1.275, 1.275, -1.25), col= "transparent", border = "green")  
+```
+
+```{r}
+node_labs = item_info %>%
+  filter(grepl(x = Idx, pattern = "Honesty.Humility")) %>% 
+  #select(contains("Facet")) %>% 
+  select(Item) %>% 
+  unite(Facet) %>% 
+  select(Facet) %>% 
+  unlist(., use.names = F)
+
+iter_plot(hh_results, 20, .layout = "spring", label_scale = 1, node_labels = node_labs, legend_label_scale = .275, layout_ratio = 1.7); # Example Plot
+    polygon(c(-1.25, -1.25, 1.25, 1.25), c(-1.25, 1.275, 1.275, -1.25), col= "transparent", border = "green")  
+```
+
+```{r}
+hh_results[[1]][[2]][1:16, 1:16, 20]
+```
+
+#### FULL NET??
+
+
+```{r}
+# Drop redundant/poor fitting items to get cov_mat for net_df that is positive-definite?
+net_df2 = net_df %>% select(!Conscientiousness_5) %>% select(!contains("Honesty.Humility")) %>% select(!contains("Agreeableness"))
+full_net = map_EBICglasso(net_df2)
+
+#(95*96)/2
+#partial.r(net_df2) %>% lower.tri(.) %>%  sum(.)
+```
+```{r}
+node_labs = item_info %>%
+  filter(Idx %in% colnames(net_df2)) %>% 
+  #select(contains("Facet")) %>% 
+  select(Item) %>% 
+  unite(Facet) %>% 
+  select(Facet) %>% 
+  unlist(., use.names = F)
+
+iter_plot(full_net, 25, .layout = "spring", label_scale = 1, node_labels = node_labs, edge_labels = F); # Example Plot
+    polygon(c(-1.25, -1.25, 1.25, 1.25), c(-1.25, 1.275, 1.275, -1.25), col= "transparent", border = "green") 
+```
